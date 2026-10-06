@@ -1,0 +1,20 @@
+# Virtual environments
+venv*/
+.venv/
+# Python caches
+__pycache__/
+*.pyc
+*.egg-info/
+# Notebook checkpoints
+.ipynb_checkpoints/
+# Keys and secrets (the GCS service account key lives OUTSIDE the workspace: SO_GCS_KEY_PATH)
+*.json
+!.vscode/*.json
+*.pem
+*.key
+.env
+# Temporary files of the atomic writes
+*.tmp
+# Data never goes into git
+*.csv
+*.parquet

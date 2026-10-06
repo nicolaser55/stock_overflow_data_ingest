@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stock-overflow-data-ingest"
+version = "2026.10.6"
+description = "Stock Overflow (SO): IBKR minute-bar ingest into the shared data folder (uses the so package of stock_overflow_workspace)"
+requires-python = ">=3.12"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ingest*"]
