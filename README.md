@@ -2,7 +2,7 @@
 
 Downloads SPY 1-minute bars from IBKR into the shared data folder of the Stock Overflow research project
 (`//100.123.162.2/stock_overflow_data/`), checks them, and maintains the raw folder that the research pipeline reads
-(`store01_rawzone/ibkr_ohlcv_data/`). Shared code (NYSE schedule, file helpers, data quality, bad tick rule) comes from the
+(`store01_rawzone/ibkr_SPY_ohlcv_data/`). Shared code (NYSE schedule, file helpers, data quality, bad tick rule) comes from the
 research workspace [`stock_overflow_workspace`](https://github.com/nicolaser55/stock_overflow_workspace) (package `so`),
 installed in the same venv.
 
@@ -34,11 +34,13 @@ Data folders (`ingest/config.py`, root overridable with the environment variable
 
 | Folder | Content | Written by |
 |---|---|---|
-| `store01_rawzone/ibkr_ohlcv_data/` | raw minute bars read by the research pipeline | `merge_staging_into_raw.py` (add-only), `organize` / `clean` / `rebuild` |
-| `store01_rawzone/ibkr_ohlcv_data_incoming/` | **staging**: new downloads, `download_log.csv`, `merge_log.csv` | `download_ibkr_ohlcv.py`, notebook step01 |
-| `.../ibkr_ohlcv_data_incoming/merged/` | staging files already added to raw (record) | `merge_staging_into_raw.py --apply` |
-| `.../ibkr_ohlcv_data_incoming/live/` | live stream bars, `ohlcv_live_YYYYMMDD.csv` (never merged) | notebook step02 |
-| `store01_rawzone/ibkr_ohlcv_data_backup_YYYYMMDD_HHMMSS/` | byte-for-byte copies of every file changed or removed | every `--apply` that changes a raw file |
+| `store01_rawzone/ibkr_SPY_ohlcv_data/` | raw minute bars read by the research pipeline | `merge_staging_into_raw.py` (add-only), `organize` / `clean` / `rebuild` |
+| `store01_rawzone/ibkr_SPY_ohlcv_data_incoming/` | **staging**: new downloads, `download_log.csv`, `merge_log.csv` | `download_ibkr_ohlcv.py`, notebook step01 |
+| `.../ibkr_SPY_ohlcv_data_incoming/merged/` | staging files already added to raw (record) | `merge_staging_into_raw.py --apply` |
+| `.../ibkr_SPY_ohlcv_data_incoming/live/` | live stream bars, `ohlcv_live_YYYYMMDD.csv` (never merged) | notebook step02 |
+| `store01_rawzone/ibkr_SPY_ohlcv_data_backup_YYYYMMDD_HHMMSS/` | byte-for-byte copies of every file changed or removed | every `--apply` that changes a raw file |
+| `store01_rawzone/ibkr_VIX_ohlcv_data/` | raw VIX / VIX3M bars (`{vix,vix3m}_{1min,daily}/`) | `merge_index_staging_into_raw.py` (add-only) |
+| `store01_rawzone/ibkr_VIX_ohlcv_data_incoming/` | **staging** for index downloads, `download_log.csv`, `merge_log.csv` | `download_ibkr_index.py` |
 
 ## 2. Setup (once per machine)
 

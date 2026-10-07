@@ -12,12 +12,13 @@ No connection to IBKR and no access to the real data folder (simulated server, t
 
     tests/test_ingest.py         IBKR client, sessions, download, raw files, maintenance, live stream, repo reader compatibility
     tests/smoke_notebooks.py     every cell of notebooks/step01-03 runs (simulated server)
+    tests/test_vix_probe.py, tests/test_index_alignment.py, tests/test_index_pipeline.py     the VIX / VIX3M probe, alignment check and download pipeline
 
     Output is forced to UTF-8 (the suites print emoji; a Windows console or pipe in cp1252 would otherwise crash the print).
 """
 
 # DEFINE THE SUITES
-SUITE_LIST = ["test_ingest.py", "smoke_notebooks.py"]
+SUITE_LIST = ["test_ingest.py", "smoke_notebooks.py", "test_vix_probe.py", "test_index_alignment.py", "test_index_pipeline.py"]
 # DEFINE THE TESTS FOLDER
 TESTS_PATH_STR = os.path.dirname(os.path.abspath(__file__))
 

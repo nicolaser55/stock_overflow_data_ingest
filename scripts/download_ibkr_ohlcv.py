@@ -7,7 +7,7 @@ from ingest.ibkr_client import IbkrApp
 from ingest.ibkr_download import get_download_session_pdf, download_session_pdf
 
 """
-Download SPY 1-minute bars from IBKR into the staging folder (store01_rawzone/ibkr_ohlcv_data_incoming/)
+Download SPY 1-minute bars from IBKR into the staging folder (store01_rawzone/ibkr_SPY_ohlcv_data_incoming/)
 
 Prerequisite: IB Gateway (or TWS) running and logged in, API enabled on the port below.
 

@@ -11,12 +11,12 @@ historical request settings, the pacing rules, and the staging / merge conventio
 Data root:
     The laptop reaches the data folder of nicodesktop through the network share //100.123.162.2/stock_overflow_data/.
     The root can be overridden with the environment variable SO_INGEST_DATA_PATH (for example to run the tests on a
-    temporary folder). The folder names under the root (store01_rawzone/ibkr_ohlcv_data/, ...) are taken from the
+    temporary folder). The folder names under the root (store01_rawzone/ibkr_SPY_ohlcv_data/, ...) are taken from the
     research workspace (so.paths) and re-rooted, so both workspaces always agree on the layout.
 
 Staging:
     Downloads never go straight into the raw folder that the research pipeline reads. They are written to the staging
-    folder (store01_rawzone/ibkr_ohlcv_data_incoming/), checked, and only then added to the raw folder by
+    folder (store01_rawzone/ibkr_SPY_ohlcv_data_incoming/), checked, and only then added to the raw folder by
     scripts/merge_staging_into_raw.py (dry run by default).
 """
 
