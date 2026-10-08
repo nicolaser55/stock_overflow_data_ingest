@@ -37,6 +37,7 @@ def get_args():
     parser.add_argument("--client-id", type=int, default=config.IBKR_DOWNLOAD_CLIENT_ID_INT)
     parser.add_argument("--max-in-flight", type=int, default=config.MAX_IN_FLIGHT_REQUEST_COUNT)
     parser.add_argument("--staging", default=config.STAGING_OHLCV_PATH_STR, help="staging folder")
+    parser.add_argument("--skip-name-check", action="store_true", help="bypass the SPY raw folder name check (temporary data roots and tests)")
     # RETURN THE ARGUMENTS
     return parser.parse_args()
 
@@ -47,6 +48,16 @@ def main():
     """
     # PARSE THE ARGUMENTS
     args = get_args()
+    # STOP WHEN THE SPY RAW FOLDER NAME AND so.paths DISAGREE (--skip-name-check IS FOR TEMPORARY DATA ROOTS AND TESTS)
+    if not args.skip_name_check:
+        # READ THE MESSAGE (EMPTY WHEN THE NAMES MATCH)
+        folder_name_problem_str = config.get_folder_name_problem_str()
+        # PRINT IT AND STOP BEFORE ANY WRITE OR IBKR CONNECTION
+        if folder_name_problem_str:
+            # PRINT THE MESSAGE
+            print(folder_name_problem_str)
+            # STOP
+            raise SystemExit(1)
     # DEFINE THE STAGING FOLDER (ENDING WITH "/")
     staging_path_str = args.staging.replace("\\", "/").rstrip("/") + "/"
     # SELECT THE SESSIONS

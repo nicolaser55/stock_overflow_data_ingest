@@ -24,7 +24,18 @@ def main():
     parser = argparse.ArgumentParser(description="Roll up day / month files of closed periods (dry run by default).")
     parser.add_argument("--apply", action="store_true", help="really write (default: dry run)")
     parser.add_argument("--raw", default=config.RAW_OHLCV_PATH_STR)
+    parser.add_argument("--skip-name-check", action="store_true", help="bypass the SPY raw folder name check (temporary data roots and tests)")
     args = parser.parse_args()
+    # STOP WHEN THE SPY RAW FOLDER NAME AND so.paths DISAGREE (--skip-name-check IS FOR TEMPORARY DATA ROOTS AND TESTS)
+    if not args.skip_name_check:
+        # READ THE MESSAGE (EMPTY WHEN THE NAMES MATCH)
+        folder_name_problem_str = config.get_folder_name_problem_str()
+        # PRINT IT AND STOP BEFORE ANY WRITE OR IBKR CONNECTION
+        if folder_name_problem_str:
+            # PRINT THE MESSAGE
+            print(folder_name_problem_str)
+            # STOP
+            raise SystemExit(1)
     # ORGANIZE THE FOLDER
     result_pdf = organize_raw_pdf(args.apply, args.raw.replace("\\", "/").rstrip("/") + "/")
     # DISPLAY THE RESULT

@@ -19,6 +19,10 @@ def main():
     """
     Prints the status of the index data.
     """
+    # WARN WHEN THE SPY RAW FOLDER NAME AND so.paths DISAGREE (THIS SCRIPT STILL RUNS)
+    folder_name_problem_str = config.get_folder_name_problem_str()
+    # PRINT THE MESSAGE AS A WARNING LINE
+    print(f"Warning: {folder_name_problem_str}") if folder_name_problem_str else None
     # DISPLAY THE FOLDERS IN USE
     print(f"Data root:     {config.DATA_ROOT_PATH_STR}")
     print(f"Index raw:     {index_config.INDEX_RAW_ROOT_PATH_STR}")

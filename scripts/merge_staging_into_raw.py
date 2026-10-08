@@ -28,7 +28,18 @@ def main():
     parser.add_argument("--include-partial", action="store_true", help="also add sessions with missing minutes")
     parser.add_argument("--staging", default=config.STAGING_OHLCV_PATH_STR)
     parser.add_argument("--raw", default=config.RAW_OHLCV_PATH_STR)
+    parser.add_argument("--skip-name-check", action="store_true", help="bypass the SPY raw folder name check (temporary data roots and tests)")
     args = parser.parse_args()
+    # STOP WHEN THE SPY RAW FOLDER NAME AND so.paths DISAGREE (--skip-name-check IS FOR TEMPORARY DATA ROOTS AND TESTS)
+    if not args.skip_name_check:
+        # READ THE MESSAGE (EMPTY WHEN THE NAMES MATCH)
+        folder_name_problem_str = config.get_folder_name_problem_str()
+        # PRINT IT AND STOP BEFORE ANY WRITE OR IBKR CONNECTION
+        if folder_name_problem_str:
+            # PRINT THE MESSAGE
+            print(folder_name_problem_str)
+            # STOP
+            raise SystemExit(1)
     # DEFINE THE FOLDERS (ENDING WITH "/")
     staging_path_str = args.staging.replace("\\", "/").rstrip("/") + "/"
     raw_path_str = args.raw.replace("\\", "/").rstrip("/") + "/"

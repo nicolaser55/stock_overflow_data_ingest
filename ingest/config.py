@@ -50,6 +50,27 @@ DOWNLOAD_LOG_FILE_PATH_STR = f"{STAGING_OHLCV_PATH_STR}download_log.csv"
 # DEFINE THE MERGE LOG (ONE ROW PER STAGING FILE ADDED TO THE RAW FOLDER; ONLY EVER APPENDED TO)
 MERGE_LOG_FILE_PATH_STR = f"{STAGING_OHLCV_PATH_STR}merge_log.csv"
 
+# FUNCTION: REPORT WHEN THE SPY RAW FOLDER NAME AND so.paths DISAGREE
+def get_folder_name_problem_str():
+    """
+    Returns:
+        str: "" when the raw folder name matches this repo, otherwise one paragraph (this never raises)
+    """
+    # COMPARE THE LEAF FROM so.paths WITH THE NAME THIS REPO EXPECTS
+    resolved_name_str = os.path.basename(RAW_OHLCV_PATH_STR.rstrip("/"))
+    # MATCHING NAMES NEED NO MESSAGE
+    if resolved_name_str == SPY_RAW_FOLDER_NAME_STR:
+        return ""
+    # STATE THE RESOLVED FOLDER, THE EXPECTED NAME, AND THE SAFE ORDER
+    return (
+        f"The SPY raw folder the code resolves from so.paths is {RAW_OHLCV_PATH_STR} ({resolved_name_str}), "
+        f"but this repo expects {SPY_RAW_FOLDER_NAME_STR}. "
+        "Safe order: (1) switch so.paths.LOCAL_OHLCV_DATA_FILE_PATH_STR in the research repo and reinstall it in the venv, "
+        "(2) stop all downloads, merges and notebooks, "
+        "(3) run scripts/rename_data_folders.py (dry run, then --apply), "
+        "(4) run scripts/index_data_status.py."
+    )
+
 """
 File Conventions (identical to the existing raw files)
 """

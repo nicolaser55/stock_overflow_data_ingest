@@ -333,7 +333,11 @@ def test_merge():
     assert merged_pdf["date"].tolist() == ["2026-09-14", "2026-09-15"] and merged_pdf["close"].tolist() == ["99.0", "21.5"]
     log_pdf = pd.read_csv(merge_log_str)
     assert log_pdf[log_pdf["bar_kind"] == "daily"]["conflict_minute_count_int"].tolist() == [1]
-    assert not os.path.exists(f"{daily_staging_str}ohlcv_data_2026.csv") and any(name_str.startswith("daily_backup_") or "_backup_" in name_str for name_str in os.listdir(raw_str))
+    raw_parent_str = os.path.dirname(raw_str.rstrip("/"))
+    backup_name_list = [name_str for name_str in os.listdir(raw_parent_str) if name_str.startswith("raw_backup_")]
+    assert not os.path.exists(f"{daily_staging_str}ohlcv_data_2026.csv") and len(backup_name_list) == 1
+    assert os.path.isfile(f"{raw_parent_str}/{backup_name_list[0]}/daily/ohlcv_data_2026.csv")
+    assert not any(name_str.startswith("daily_backup_") for name_str in os.listdir(raw_str))
     passed("merge: dry run, add-only 1-minute files, checks, include-partial, daily merge with existing rows winning, log")
 
 # TEST: THE FOLDER RENAME ON A TEMPORARY DATA ROOT
@@ -374,14 +378,32 @@ def test_rename_data_folders():
                 file_object.write(blob_bytes)
         return rawzone_str, file_dict
 
-    env_dict = {**os.environ, "PYTHONPATH": root_str, "PYTHONIOENCODING": "utf-8"}
+    import contextlib
+    import io
+    module.get_running_job_str_list = lambda: []
+    original_raw_str = config.RAW_OHLCV_PATH_STR
+    config.RAW_OHLCV_PATH_STR = os.path.dirname(original_raw_str.rstrip("/")) + "/ibkr_SPY_ohlcv_data/"
+
+    def run_main(arg_str_list):
+        stdout_file = io.StringIO()
+        old_argv = sys.argv
+        sys.argv = [script_str] + arg_str_list
+        try:
+            with contextlib.redirect_stdout(stdout_file):
+                try:
+                    code_int = module.main()
+                except SystemExit as error:
+                    code_int = error.code
+        finally:
+            sys.argv = old_argv
+        return code_int, stdout_file.getvalue()
+
     base_str = tempfile.mkdtemp(prefix="so_rename_").replace("\\", "/")
     rawzone_str, file_dict = build_tree(base_str)
     dry_manifest_str = f"{base_str}/manifest_dry.csv"
-    dry = subprocess.run([sys.executable, script_str, "--data-root", base_str, "--manifest", dry_manifest_str],
-                         capture_output=True, text=True, env=env_dict, encoding="utf-8")
-    assert dry.returncode == 0 and "Dry run: nothing was renamed." in dry.stdout and "ibkr_SPY_ohlcv_data -> ibkr_spy_1min" in dry.stdout \
-        and "Rename-Item -LiteralPath" in dry.stdout, dry.stdout + dry.stderr
+    dry_code_int, dry_stdout_str = run_main(["--data-root", base_str, "--manifest", dry_manifest_str])
+    assert dry_code_int == 0 and "Dry run: nothing was renamed." in dry_stdout_str and "ibkr_SPY_ohlcv_data -> ibkr_spy_1min" in dry_stdout_str \
+        and "Rename-Item -LiteralPath" in dry_stdout_str and "Warning:" in dry_stdout_str and "ibkr_spy_1min" in dry_stdout_str, dry_stdout_str
     assert os.path.isdir(f"{rawzone_str}ibkr_SPY_ohlcv_data") and not os.path.exists(f"{rawzone_str}ibkr_spy_1min")
     dry_manifest_text = open(dry_manifest_str, encoding="utf-8").read()
     assert "ibkr_SPY_ohlcv_data/ohlcv_data_2024.csv" in dry_manifest_text and "ibkr_ohlcv_data_backup_20261004_185149" not in dry_manifest_text
@@ -391,13 +413,14 @@ def test_rename_data_folders():
     with open(f"{blocked_zone_str}ibkr_spy_1min/keep.txt", "wb") as file_object:
         file_object.write(b"keep")
     blocked_manifest_str = f"{blocked_str}/manifest_block.csv"
-    blocked = subprocess.run([sys.executable, script_str, "--apply", "--data-root", blocked_str, "--manifest", blocked_manifest_str],
-                             capture_output=True, text=True, env=env_dict, encoding="utf-8")
-    assert blocked.returncode != 0 and "already exists" in blocked.stdout and not os.path.exists(blocked_manifest_str), blocked.stdout + blocked.stderr
+    blocked_code_int, blocked_stdout_str = run_main(["--apply", "--ignore-research-paths", "--data-root", blocked_str, "--manifest", blocked_manifest_str])
+    assert blocked_code_int != 0 and "already exists" in blocked_stdout_str and not os.path.exists(blocked_manifest_str), blocked_stdout_str
     assert open(f"{blocked_zone_str}ibkr_spy_1min/keep.txt", "rb").read() == b"keep" and os.path.isdir(f"{blocked_zone_str}ibkr_SPY_ohlcv_data")
-    applied = subprocess.run([sys.executable, script_str, "--apply", "--data-root", base_str, "--manifest", f"{base_str}/manifest_apply.csv"],
-                             capture_output=True, text=True, env=env_dict, encoding="utf-8")
-    assert applied.returncode == 0 and "identical" in applied.stdout, applied.stdout + applied.stderr
+    refused_code_int, refused_stdout_str = run_main(["--apply", "--data-root", base_str, "--manifest", f"{base_str}/manifest_refused.csv"])
+    assert refused_code_int == 1 and "ibkr_SPY_ohlcv_data" in refused_stdout_str and "ibkr_spy_1min" in refused_stdout_str \
+        and not os.path.exists(f"{base_str}/manifest_refused.csv") and os.path.isdir(f"{rawzone_str}ibkr_SPY_ohlcv_data"), refused_stdout_str
+    applied_code_int, applied_stdout_str = run_main(["--apply", "--ignore-research-paths", "--data-root", base_str, "--manifest", f"{base_str}/manifest_apply.csv"])
+    assert applied_code_int == 0 and "identical" in applied_stdout_str, applied_stdout_str
     renamed_dict = {"ibkr_spy_1min/ohlcv_data_2024.csv": "ibkr_SPY_ohlcv_data/ohlcv_data_2024.csv",
                     "ibkr_spy_1min/nested/note.txt": "ibkr_SPY_ohlcv_data/nested/note.txt",
                     "ibkr_spy_1min_staging/download_log.csv": "ibkr_SPY_ohlcv_data_incoming/download_log.csv",
@@ -415,18 +438,78 @@ def test_rename_data_folders():
         assert not os.path.exists(f"{rawzone_str}{old_name_str}"), old_name_str
     assert open(f"{rawzone_str}ibkr_ohlcv_data_backup_20261004_185149/keep.csv", "rb").read() == b"do-not-rename\r\n"
     assert open(f"{rawzone_str}unrelated/x.csv", "rb").read() == b"x\r\n"
+    config.RAW_OHLCV_PATH_STR = original_raw_str
     passed("rename script: dry run, refuse when the new folder exists, move on a temporary root, bytes identical")
+
+# TEST: THE PROCESS LIST WHEN POWERSHELL OR ps IS MISSING
+def test_running_job_list_without_powershell():
+    import importlib.util
+    root_str = os.path.dirname(TESTS_PATH_STR)
+    script_str = os.path.join(root_str, "scripts", "rename_data_folders.py")
+    spec = importlib.util.spec_from_file_location("rename_data_folders_missing_ps", script_str)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    original_run = module.subprocess.run
+
+    def raise_missing(*args, **kwargs):
+        raise FileNotFoundError("powershell")
+
+    module.subprocess.run = raise_missing
+    try:
+        result_list = module.get_running_job_str_list()
+    finally:
+        module.subprocess.run = original_run
+    assert result_list and result_list[0].startswith("Could not list processes"), result_list
+    passed("process list: a missing powershell or ps returns Could not list processes")
 
 # TEST: THE SCRIPTS
 def test_scripts():
     root_str = os.path.dirname(TESTS_PATH_STR)
     env_dict = {**os.environ, "PYTHONPATH": root_str, "PYTHONIOENCODING": "utf-8"}
-    listed = subprocess.run([sys.executable, os.path.join(root_str, "scripts", "download_ibkr_index.py"), "--list", "--symbols", "VIX3M", "--bars", "1min", "--date2", "2009-08-14"],
+    listed = subprocess.run([sys.executable, os.path.join(root_str, "scripts", "download_ibkr_index.py"), "--skip-name-check", "--list", "--symbols", "VIX3M", "--bars", "1min", "--date2", "2009-08-14"],
                             capture_output=True, text=True, env=env_dict, encoding="utf-8")
     assert listed.returncode == 0 and "Plan: 3 request(s)" in listed.stdout and "vix3m_1min" in listed.stdout, listed.stdout + listed.stderr
-    merged = subprocess.run([sys.executable, os.path.join(root_str, "scripts", "merge_index_staging_into_raw.py")], capture_output=True, text=True, env=env_dict, encoding="utf-8")
+    merged = subprocess.run([sys.executable, os.path.join(root_str, "scripts", "merge_index_staging_into_raw.py"), "--skip-name-check"], capture_output=True, text=True, env=env_dict, encoding="utf-8")
     assert merged.returncode == 0 and "no staging files" in merged.stdout, merged.stdout + merged.stderr
     passed("scripts: --list plans without a connection, the merge dry run runs on empty folders")
+
+# TEST: THE SPY RAW FOLDER NAME CHECK
+def test_folder_name_check():
+    root_str = os.path.dirname(TESTS_PATH_STR)
+    script_str = os.path.join(root_str, "scripts", "download_ibkr_index.py")
+    parent_str = os.path.dirname(config.RAW_OHLCV_PATH_STR.rstrip("/"))
+    original_str = config.RAW_OHLCV_PATH_STR
+    try:
+        config.RAW_OHLCV_PATH_STR = f"{parent_str}/ibkr_spy_1min/"
+        assert config.get_folder_name_problem_str() == ""
+        config.RAW_OHLCV_PATH_STR = f"{parent_str}/ibkr_SPY_ohlcv_data/"
+        message_str = config.get_folder_name_problem_str()
+        assert "ibkr_spy_1min" in message_str and "ibkr_SPY_ohlcv_data" in message_str
+    finally:
+        config.RAW_OHLCV_PATH_STR = original_str
+
+    def run_list(leaf_str, extra_str_list):
+        raw_str = f"{parent_str}/{leaf_str}/"
+        arg_text = ", ".join([repr(script_str), "'--list'", "'--symbols'", "'VIX3M'", "'--bars'", "'1min'", "'--date2'", "'2009-08-14'"] + [repr(arg_str) for arg_str in extra_str_list])
+        helper_str = (
+            "import sys\n"
+            f"sys.path.insert(0, {root_str!r})\n"
+            "import ingest.config as config\n"
+            f"config.RAW_OHLCV_PATH_STR = {raw_str!r}\n"
+            f"sys.argv = [{arg_text}]\n"
+            "import runpy\n"
+            f"runpy.run_path({script_str!r}, run_name='__main__')\n"
+        )
+        return subprocess.run([sys.executable, "-c", helper_str], capture_output=True, text=True, encoding="utf-8",
+                              env={**os.environ, "PYTHONPATH": root_str, "PYTHONIOENCODING": "utf-8"})
+
+    disagree = run_list("ibkr_SPY_ohlcv_data", [])
+    assert disagree.returncode == 1 and "ibkr_spy_1min" in disagree.stdout and "ibkr_SPY_ohlcv_data" in disagree.stdout and "Plan:" not in disagree.stdout, disagree.stdout + disagree.stderr
+    skipped = run_list("ibkr_SPY_ohlcv_data", ["--skip-name-check"])
+    assert skipped.returncode == 0 and "Plan: 3 request(s)" in skipped.stdout, skipped.stdout + skipped.stderr
+    agree = run_list("ibkr_spy_1min", [])
+    assert agree.returncode == 0 and "Plan: 3 request(s)" in agree.stdout, agree.stdout + agree.stderr
+    passed("folder name check: empty when the leaf is ibkr_spy_1min, message and exit 1 otherwise, --skip-name-check exits 0")
 
 # RUN THE TESTS
 if __name__ == "__main__":
@@ -438,5 +521,7 @@ if __name__ == "__main__":
     test_daily_download()
     test_merge()
     test_rename_data_folders()
+    test_running_job_list_without_powershell()
     test_scripts()
+    test_folder_name_check()
     print("\nAll index pipeline tests passed ✅")

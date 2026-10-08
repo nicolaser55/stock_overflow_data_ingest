@@ -52,6 +52,8 @@ if __name__ == "__main__":
     try:
         # REPLACE THE IBKR APPLICATION BY THE SIMULATED SERVER
         ingest.ibkr_client.IbkrApp = FakeIbkrApp
+        # THE SMOKE ROOT USES THE LEAF FROM so.paths; ALIGN THE EXPECTED NAME SO THE NOTEBOOK NAME CHECK DOES NOT STOP THE RUN
+        config.SPY_RAW_FOLDER_NAME_STR = os.path.basename(config.RAW_OHLCV_PATH_STR.rstrip("/"))
         # BUILD A SMALL RAW FOLDER: THE LAST 15 CALENDAR DAYS MINUS THE LAST 3 SESSIONS (THE NOTEBOOK DOWNLOADS THEM)
         now_ny_ts = get_ny_now_ts()
         session_pdf = get_session_pdf(now_ny_ts - pd.Timedelta(days=15), now_ny_ts - pd.Timedelta(days=5))

@@ -18,8 +18,8 @@ Index Merge: add the checked staging files of an index to its raw folder (ADD-ON
     1-minute files (one per session): copied into the raw folder as new day files after the checks below. A date the raw folder already has is never
         replaced, and an existing raw file is never changed. Added files are moved to <staging>/merged/.
     Daily files (one per year): merged into the raw file of the same period with the engine of ingest.raw_files (text kept, rows already in raw win,
-        conflicting rows are counted and reported, backup first, atomic write, verified, all or nothing). The staged file is moved to the backup folder
-        of the run.
+        conflicting rows are counted and reported, backup first, atomic write, verified, all or nothing). The backup folder is a sibling of the index
+        raw root, <raw root>_backup_YYYYMMDD_HHMMSS/<leaf>/ (for example ibkr_vix_family_backup_<time>/vix_daily/). The staged file is moved there.
 
 Checks before a file is added: every price is a positive number, high >= max(open, close, low) and low <= min(open, close), no minute / date twice, every
 timestamp is a bar of the date of the file (1-minute files), and no missing minute inside the core hours (09:31 - 15:59) unless include_partial_bool_in.
@@ -96,9 +96,14 @@ def merge_index_staging_into_raw_pdf(symbol_str_in, bar_kind_str_in, apply_bool_
         # DISPLAY INFORMATION AND RETURN
         print(f"ℹ️ {symbol_str_in} {bar_kind_str_in}: no staging files in {staging_path_str}") if alert_in else None
         return pd.DataFrame()
-    # COLLECT THE DATES ALREADY IN RAW AND DEFINE THE BACKUP FOLDER OF THIS RUN (CREATED ONLY WHEN USED)
+    # COLLECT THE DATES ALREADY IN RAW
     raw_date_set = get_present_date_set([raw_path_str])
-    backup_path_str = get_backup_path_str(raw_path_str)
+    # DEFINE THE BACKUP AS A SIBLING OF THE INDEX RAW ROOT (<root>_backup_<time>/<leaf>/), NOT A FOLDER INSIDE IT
+    raw_root_path_str = os.path.dirname(raw_path_str.rstrip("/")) + "/"
+    # DEFINE THE LEAF (vix_daily, vix_1min, ...)
+    leaf_name_str = os.path.basename(raw_path_str.rstrip("/"))
+    # DEFINE THE BACKUP FOLDER OF THIS RUN (CREATED ONLY WHEN USED)
+    backup_path_str = f"{get_backup_path_str(raw_root_path_str)}{leaf_name_str}/"
     # LIST TO HOLD THE RESULTS AND THE LOG ROWS
     row_dict_list, log_dict_list = [], []
     # ITERATE OVER THE STAGING FILES

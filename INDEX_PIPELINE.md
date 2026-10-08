@@ -38,7 +38,7 @@ Repeating a run is safe: finished requests are saved, present dates are skipped.
   because the session window changed over the years. A partial session is requested up to 3 times, then saved and flagged. Empty / error sessions are not saved.
 - **Finished sessions**: every session before today, and today only from 17:00 New York.
 - **Merge** (add-only, dry run by default): 1-minute files are copied as new day files after the checks (positive prices, high/low consistent, no duplicate minutes, no bars of another date,
-  no core-hour gaps unless `--include-partial`); a date already in raw is skipped. Daily files are merged into the raw year file with existing rows winning (conflicts counted, backup first).
+  no core-hour gaps unless `--include-partial`); a date already in raw is skipped. Daily files are merged into the raw year file with existing rows winning (conflicts counted, backup first). The daily backup is a sibling of the index raw root (`ibkr_vix_family_backup_<time>/vix_daily/`).
 - The download log also records the ibapi and IB Gateway server version of each attempt.
 
 ## Not verified on the real server (first run: use the small trial)

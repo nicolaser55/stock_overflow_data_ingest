@@ -25,10 +25,15 @@ Dry run by default: it writes a manifest and prints the rollback commands, and i
 The manifest (relative path, size, CSV row count, SHA-256) is written in the working directory before any rename.
 If a new folder already exists, or the dry run finds any other problem, nothing is renamed and no manifest is written.
 If a download or merge script may be running, the script stops unless you type YES.
+
+The name check exists because so.paths lives in another repo (stock_overflow_workspace). This script compares the SPY raw folder
+that so.paths resolves with the name this repo expects. A dry run prints that message as a warning. --apply refuses with the
+same message, and renames nothing, unless --ignore-research-paths is given.
 """
 
-# DEFINE THE SCRIPT NAMES THAT DOWNLOAD OR MERGE (A RUNNING ONE BLOCKS THE RENAME UNTIL YOU CONFIRM)
-JOB_SCRIPT_NAME_LIST = ["download_ibkr_ohlcv.py", "download_ibkr_index.py", "merge_staging_into_raw.py", "merge_index_staging_into_raw.py"]
+# DEFINE THE COMMAND-LINE FRAGMENTS THAT MEAN A DOWNLOAD, A MERGE, OR A NOTEBOOK MAY BE USING THE DATA
+JOB_SCRIPT_NAME_LIST = ["download_ibkr_ohlcv.py", "download_ibkr_index.py", "merge_staging_into_raw.py", "merge_index_staging_into_raw.py",
+                        "ibkr_data_stream", "step01_ibkr_download", "step02_ibkr_live_stream", "jupyter", "ipykernel"]
 # DEFINE THE MANIFEST COLUMNS
 MANIFEST_COL_STR_LIST = ["relative_path", "size_bytes", "row_count", "sha256"]
 
@@ -125,21 +130,27 @@ def get_plan_problem_str_list(plan_dict_list_in):
     return problem_str_list
 
 
-# FUNCTION: LIST PYTHON COMMAND LINES THAT LOOK LIKE A DOWNLOAD OR A MERGE
+# FUNCTION: LIST COMMAND LINES THAT LOOK LIKE A DOWNLOAD, A MERGE, OR A NOTEBOOK
 def get_running_job_str_list():
     """
     Returns:
         list[str]: Command lines (one entry describing the failure when the process list cannot be read)
     """
-    # ASK WINDOWS FOR EVERY PYTHON COMMAND LINE
-    result = subprocess.run(["powershell", "-NoProfile", "-Command",
-                             "Get-CimInstance Win32_Process | Where-Object { $_.Name -like 'python*' } | Select-Object -ExpandProperty CommandLine"],
-                            capture_output=True, text=True, encoding="utf-8", errors="replace")
+    # OPEN NOTEBOOKS, THE RESEARCH PIPELINE AND EXPLORER WINDOWS ON THE SHARE CANNOT BE SEEN FROM HERE
+    print("Warning: open notebooks, the research pipeline and Explorer windows on the share cannot be detected and must be closed by hand.")
+    # WINDOWS USES POWERSHELL; OTHER SYSTEMS USE ps
+    command_str_list = ["powershell", "-NoProfile", "-Command",
+                         "Get-CimInstance Win32_Process | Where-Object { $_.Name -like 'python*' } | Select-Object -ExpandProperty CommandLine"] if os.name == "nt" else ["ps", "-eo", "args"]
+    # READ THE PROCESS LIST (MISSING POWERSHELL OR ps IS A POSSIBLE RUNNING JOB, NOT A CRASH)
+    try:
+        result = subprocess.run(command_str_list, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    except (FileNotFoundError, OSError) as error:
+        return [f"Could not list processes: {error}"]
     # IF THE PROCESS LIST CANNOT BE READ, TREAT THAT AS A POSSIBLE RUNNING JOB
     if result.returncode != 0:
         detail_str = (result.stderr or result.stdout or "no detail").strip()
         return [f"Could not list processes: {detail_str}"]
-    # KEEP THE LINES THAT NAME A DOWNLOAD OR A MERGE SCRIPT
+    # KEEP THE LINES THAT NAME A DOWNLOAD, A MERGE, OR A NOTEBOOK
     return [line_str.strip() for line_str in result.stdout.splitlines()
             if line_str.strip() and any(name_str in line_str for name_str in JOB_SCRIPT_NAME_LIST)]
 
@@ -328,7 +339,19 @@ def main():
     parser.add_argument("--apply", action="store_true", help="rename the folders (default: dry run, no rename)")
     parser.add_argument("--data-root", default=config.DATA_ROOT_PATH_STR, help="data root (default: SO_INGEST_DATA_PATH or the share)")
     parser.add_argument("--manifest", default="", help="manifest CSV path (default: rename_data_folders_manifest_<time>.csv in the working directory)")
+    parser.add_argument("--ignore-research-paths", action="store_true", help="apply even when so.paths still names a different SPY raw folder")
     args = parser.parse_args()
+    # READ THE SPY RAW NAME THAT so.paths RESOLVES (so.paths LIVES IN THE RESEARCH REPO)
+    folder_name_problem_str = config.get_folder_name_problem_str()
+    # REFUSE --apply WHILE THE RESEARCH REPO STILL POINTS AT A DIFFERENT RAW FOLDER
+    if folder_name_problem_str and args.apply and not args.ignore_research_paths:
+        # PRINT THE MESSAGE AND RENAME NOTHING
+        print(folder_name_problem_str)
+        print("Nothing was changed.")
+        return 1
+    # A DRY RUN, OR --apply WITH --ignore-research-paths, ONLY WARNS
+    if folder_name_problem_str:
+        print(f"Warning: {folder_name_problem_str}")
     # DEFINE THE RAW ZONE
     rawzone_path_str = get_rawzone_path_str(args.data_root)
     print(f"Data root: {args.data_root.replace(chr(92), '/').rstrip('/')}/")

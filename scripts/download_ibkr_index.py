@@ -40,7 +40,18 @@ def main():
     parser.add_argument("--host", default=config.IBKR_HOST_STR)
     parser.add_argument("--port", type=int, default=config.IBKR_PORT_INT, help="4001 Gateway live, 4002 Gateway paper, 7496 / 7497 TWS")
     parser.add_argument("--client-id", type=int, default=config.IBKR_DOWNLOAD_CLIENT_ID_INT)
+    parser.add_argument("--skip-name-check", action="store_true", help="bypass the SPY raw folder name check (temporary data roots and tests)")
     args = parser.parse_args()
+    # STOP WHEN THE SPY RAW FOLDER NAME AND so.paths DISAGREE (--skip-name-check IS FOR TEMPORARY DATA ROOTS AND TESTS)
+    if not args.skip_name_check:
+        # READ THE MESSAGE (EMPTY WHEN THE NAMES MATCH)
+        folder_name_problem_str = config.get_folder_name_problem_str()
+        # PRINT IT AND STOP BEFORE ANY WRITE OR IBKR CONNECTION
+        if folder_name_problem_str:
+            # PRINT THE MESSAGE
+            print(folder_name_problem_str)
+            # STOP
+            raise SystemExit(1)
     # PLAN THE TASKS
     task_dict_list = []
     for symbol_str in args.symbols:
