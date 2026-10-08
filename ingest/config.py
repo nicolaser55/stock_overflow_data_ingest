@@ -33,12 +33,6 @@ RAW_OHLCV_PATH_STR = DATA_ROOT_PATH_STR + so_paths.LOCAL_OHLCV_DATA_FILE_PATH_ST
 SPY_RAW_FOLDER_NAME_STR = "ibkr_spy_1min"
 # DEFINE THE STAGING FOLDER NAME (SIBLING OF THE RAW FOLDER UNDER store01_rawzone/, NOT A SUFFIX OF THE RAW FOLDER)
 SPY_STAGING_FOLDER_NAME_STR = "ibkr_spy_1min_staging"
-# DEFINE THE PREVIOUS SPY RAW AND STAGING FOLDER NAMES (THE STATUS SCAN STILL REPORTS A FOLDER LEFT UNDER ONE OF THESE)
-SPY_LEGACY_RAW_FOLDER_NAME_STR = "ibkr_SPY_ohlcv_data"
-# DEFINE THE PREVIOUS SPY STAGING FOLDER NAME
-SPY_LEGACY_STAGING_FOLDER_NAME_STR = "ibkr_SPY_ohlcv_data_incoming"
-# DEFINE THE LIST THE STATUS SCAN READS
-SPY_LEGACY_FOLDER_NAME_LIST = [SPY_LEGACY_RAW_FOLDER_NAME_STR, SPY_LEGACY_STAGING_FOLDER_NAME_STR]
 # DEFINE THE STAGING FOLDER (NEW DOWNLOADS WAIT HERE UNTIL THEY ARE MERGED INTO THE RAW FOLDER)
 STAGING_OHLCV_PATH_STR = os.path.dirname(RAW_OHLCV_PATH_STR.rstrip("/")) + f"/{SPY_STAGING_FOLDER_NAME_STR}/"
 # DEFINE THE FOLDER WHERE MERGED STAGING FILES ARE MOVED (KEPT AS A RECORD OF WHAT WAS ADDED AND WHEN)
@@ -65,10 +59,8 @@ def get_folder_name_problem_str():
     return (
         f"The SPY raw folder the code resolves from so.paths is {RAW_OHLCV_PATH_STR} ({resolved_name_str}), "
         f"but this repo expects {SPY_RAW_FOLDER_NAME_STR}. "
-        "Safe order: (1) switch so.paths.LOCAL_OHLCV_DATA_FILE_PATH_STR in the research repo and reinstall it in the venv, "
-        "(2) stop all downloads, merges and notebooks, "
-        "(3) run scripts/rename_data_folders.py (dry run, then --apply), "
-        "(4) run scripts/index_data_status.py."
+        "Switch so.paths.LOCAL_OHLCV_DATA_FILE_PATH_STR in the research repo to that folder name (and rename the folder on the share, with every download, merge "
+        "and notebook stopped), then reinstall the research repo in the venv."
     )
 
 """

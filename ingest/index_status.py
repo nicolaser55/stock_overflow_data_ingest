@@ -1,8 +1,8 @@
 import os
 import pandas as pd
 # IMPORT THE INGEST CONFIGURATION
-from ingest import config
 from ingest import index_config
+from ingest import stock_config
 # IMPORT THE SESSION AND DOWNLOAD FUNCTIONS
 from ingest.sessions import get_ny_now_ts, get_session_pdf
 from ingest.index_download import get_index_closed_session_pdf
@@ -68,8 +68,8 @@ def get_index_status_pdf():
 # FUNCTION: FIND OTHER FOLDERS THAT MAY HOLD INDEX DATA
 def get_other_folder_pdf(rawzone_path_str_in=None):
     """
-    Lists the folders of the raw zone whose name looks related (ibkr, index, vix), or that still use a previous SPY or index folder name (including
-    <old raw folder>_backup_...), and that are not one of the configured index folders, so that data left under an older folder name is found.
+    Lists the folders of the raw zone whose name looks related (ibkr, index, vix) and that are not one of the configured index or stock folders, so that
+    data left in a folder under another name (including <raw folder>_backup_...) is found.
 
     Args:
         rawzone_path_str_in (str | None): Raw zone folder (None = the parent of the configured index raw root)
@@ -83,18 +83,15 @@ def get_other_folder_pdf(rawzone_path_str_in=None):
     if not os.path.isdir(rawzone_path_str):
         # RETURN AN EMPTY TABLE
         return pd.DataFrame(columns=["name", "path", "subfolder_count_int", "csv_file_count_int"])
-    # DEFINE THE CONFIGURED ROOTS (THE CURRENT INDEX FOLDER NAMES)
+    # DEFINE THE CONFIGURED FOLDERS (THE CURRENT INDEX ROOTS AND THE STOCK FOLDERS)
     configured_name_set = {os.path.basename(root_str.rstrip("/")) for root_str in [index_config.INDEX_RAW_ROOT_PATH_STR, index_config.INDEX_STAGING_ROOT_PATH_STR]}
-    # DEFINE THE PREVIOUS FOLDER NAMES (A FOLDER LEFT UNDER AN OLD NAME, OR A BACKUP OF THAT RAW FOLDER, IS STILL REPORTED)
-    legacy_name_list = index_config.INDEX_LEGACY_FOLDER_NAME_LIST + config.SPY_LEGACY_FOLDER_NAME_LIST
+    configured_name_set |= stock_config.get_stock_folder_name_set()
     # LIST TO HOLD THE ROWS
     row_dict_list = []
     # ITERATE OVER THE FOLDERS
     for name_str in sorted(os.listdir(rawzone_path_str)):
-        # A PREVIOUS NAME, OR A BACKUP NAMED AFTER A PREVIOUS RAW FOLDER, COUNTS AS RELATED
-        legacy_bool = any(name_str == legacy_name_str or name_str.startswith(f"{legacy_name_str}_backup_") for legacy_name_str in legacy_name_list)
         # SKIP THE CONFIGURED FOLDERS AND UNRELATED NAMES
-        if name_str in configured_name_set or not os.path.isdir(f"{rawzone_path_str}{name_str}") or not (legacy_bool or any(key in name_str.lower() for key in ["ibkr", "index", "vix"])):
+        if name_str in configured_name_set or not os.path.isdir(f"{rawzone_path_str}{name_str}") or not any(key in name_str.lower() for key in ["ibkr", "index", "vix"]):
             continue
         # COUNT THE SUBFOLDERS AND CSV FILES
         walk_list = list(os.walk(f"{rawzone_path_str}{name_str}"))

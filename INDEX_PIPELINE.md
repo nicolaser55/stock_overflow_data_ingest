@@ -51,4 +51,4 @@ Repeating a run is safe: finished requests are saved, present dates are skipped.
 ## Research notes
 
 - Dates from 2026-05-14 are staged normally; the untouched window of the research must not be evaluated on them.
-- The label convention of the 1-minute index bars (start or end of the minute) is still not proven; see `VIX_PROBE.md` and the project doc `claude/VIX_PROBE_RESULTS_2026-10-06.md`.
+- The label convention of the 1-minute index bars (start or end of the minute) is still not proven; see the project doc `claude/VIX_PROBE_RESULTS_2026-10-06.md` and the probe tools (`scripts/probe_ibkr_vix.py`, `scripts/probe_index_alignment.py`).

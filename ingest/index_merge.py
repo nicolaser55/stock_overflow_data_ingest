@@ -69,7 +69,7 @@ def get_file_minute_check_dict(text_pdf_in, session_date_in):
 
 # FUNCTION: MERGE THE STAGING FILES OF ONE INDEX AND BAR KIND
 def merge_index_staging_into_raw_pdf(symbol_str_in, bar_kind_str_in, apply_bool_in=False, include_partial_bool_in=False, staging_path_str_in=None,
-                                     raw_path_str_in=None, log_file_path_str_in=index_config.INDEX_MERGE_LOG_FILE_PATH_STR, alert_in=True):
+                                     raw_path_str_in=None, log_file_path_str_in=index_config.INDEX_MERGE_LOG_FILE_PATH_STR, alert_in=True, backup_path_str_in=None):
     """
     Args:
         symbol_str_in (str): "VIX" or "VIX3M"
@@ -80,6 +80,7 @@ def merge_index_staging_into_raw_pdf(symbol_str_in, bar_kind_str_in, apply_bool_
         raw_path_str_in (str | None): Raw folder (None = the configured one)
         log_file_path_str_in (str): Merge log
         alert_in (bool): Display information
+        backup_path_str_in (str | None): Backup folder of a daily merge (None = <index raw root>_backup_<time>/<leaf>/; the stock pipeline passes its own)
 
     Returns:
         pd.DataFrame: One row per staging file: symbol, bar_kind, file_name_str, row_count_int, missing_count_int, price_issue_count_int, in_raw_bool,
@@ -103,7 +104,7 @@ def merge_index_staging_into_raw_pdf(symbol_str_in, bar_kind_str_in, apply_bool_
     # DEFINE THE LEAF (vix_daily, vix_1min, ...)
     leaf_name_str = os.path.basename(raw_path_str.rstrip("/"))
     # DEFINE THE BACKUP FOLDER OF THIS RUN (CREATED ONLY WHEN USED)
-    backup_path_str = f"{get_backup_path_str(raw_root_path_str)}{leaf_name_str}/"
+    backup_path_str = backup_path_str_in or f"{get_backup_path_str(raw_root_path_str)}{leaf_name_str}/"
     # LIST TO HOLD THE RESULTS AND THE LOG ROWS
     row_dict_list, log_dict_list = [], []
     # ITERATE OVER THE STAGING FILES
