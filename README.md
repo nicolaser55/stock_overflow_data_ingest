@@ -2,7 +2,7 @@
 
 Downloads SPY 1-minute bars from IBKR into the shared data folder of the Stock Overflow research project
 (`//100.123.162.2/stock_overflow_data/`), checks them, and maintains the raw folder that the research pipeline reads
-(`store01_rawzone/ibkr_SPY_ohlcv_data/`). Shared code (NYSE schedule, file helpers, data quality, bad tick rule) comes from the
+(`store01_rawzone/ibkr_spy_1min/`). Shared code (NYSE schedule, file helpers, data quality, bad tick rule) comes from the
 research workspace [`stock_overflow_workspace`](https://github.com/nicolaser55/stock_overflow_workspace) (package `so`),
 installed in the same venv.
 
@@ -34,13 +34,15 @@ Data folders (`ingest/config.py`, root overridable with the environment variable
 
 | Folder | Content | Written by |
 |---|---|---|
-| `store01_rawzone/ibkr_SPY_ohlcv_data/` | raw minute bars read by the research pipeline | `merge_staging_into_raw.py` (add-only), `organize` / `clean` / `rebuild` |
-| `store01_rawzone/ibkr_SPY_ohlcv_data_incoming/` | **staging**: new downloads, `download_log.csv`, `merge_log.csv` | `download_ibkr_ohlcv.py`, notebook step01 |
-| `.../ibkr_SPY_ohlcv_data_incoming/merged/` | staging files already added to raw (record) | `merge_staging_into_raw.py --apply` |
-| `.../ibkr_SPY_ohlcv_data_incoming/live/` | live stream bars, `ohlcv_live_YYYYMMDD.csv` (never merged) | notebook step02 |
-| `store01_rawzone/ibkr_SPY_ohlcv_data_backup_YYYYMMDD_HHMMSS/` | byte-for-byte copies of every file changed or removed | every `--apply` that changes a raw file |
-| `store01_rawzone/ibkr_VIX_ohlcv_data/` | raw VIX / VIX3M bars (`{vix,vix3m}_{1min,daily}/`) | `merge_index_staging_into_raw.py` (add-only) |
-| `store01_rawzone/ibkr_VIX_ohlcv_data_incoming/` | **staging** for index downloads, `download_log.csv`, `merge_log.csv` | `download_ibkr_index.py` |
+| `store01_rawzone/ibkr_spy_1min/` | raw minute bars read by the research pipeline | `merge_staging_into_raw.py` (add-only), `organize` / `clean` / `rebuild` |
+| `store01_rawzone/ibkr_spy_1min_staging/` | **staging**: new downloads, `download_log.csv`, `merge_log.csv` | `download_ibkr_ohlcv.py`, notebook step01 |
+| `.../ibkr_spy_1min_staging/merged/` | staging files already added to raw (record) | `merge_staging_into_raw.py --apply` |
+| `.../ibkr_spy_1min_staging/live/` | live stream bars, `ohlcv_live_YYYYMMDD.csv` (never merged) | notebook step02 |
+| `store01_rawzone/ibkr_spy_1min_backup_YYYYMMDD_HHMMSS/` | byte-for-byte copies of every file changed or removed | every `--apply` that changes a raw file |
+| `store01_rawzone/ibkr_vix_family/` | raw VIX / VIX3M bars (`{vix,vix3m}_{1min,daily}/`) | `merge_index_staging_into_raw.py` (add-only) |
+| `store01_rawzone/ibkr_vix_family_staging/` | **staging** for index downloads, `download_log.csv`, `merge_log.csv` | `download_ibkr_index.py` |
+
+**Renamed on 2026-10-08:** `ibkr_SPY_ohlcv_data/` → `ibkr_spy_1min/`, `ibkr_SPY_ohlcv_data_incoming/` → `ibkr_spy_1min_staging/`, `ibkr_VIX_ohlcv_data/` → `ibkr_vix_family/`, `ibkr_VIX_ohlcv_data_incoming/` → `ibkr_vix_family_staging/`. Sibling backups use the raw folder name plus `_backup_YYYYMMDD_HHMMSS`. The SPY raw leaf is `so.paths.LOCAL_OHLCV_DATA_FILE_PATH_STR` in the research workspace; that constant is switched to `ibkr_spy_1min` when the folders on the share are renamed.
 
 ## 2. Setup (once per machine)
 
@@ -81,6 +83,7 @@ reported bad ticks, and `pipeline/step00_data_quality_check.ipynb`. The same ste
 | `clean_ohlcv_data.py` | folds left-over day / month files into the month / year file that already exists | `--apply` |
 | `rebuild_ohlcv_data.py` | rewrites a folder into the organized layout, into `<raw>_rebuilt/` by default | `--apply` |
 | `find_ohlcv_data_issues.py` | missing sessions, missing / extra minutes, duplicates, bars on non-session dates | never (`--save` a CSV) |
+| `rename_data_folders.py` | moves the previous raw and staging folders to the names in the table above | `--apply` (dry run writes a manifest only) |
 | `gcs_mount.py` | mounts the GCS bucket with rclone (key path in `SO_GCS_KEY_PATH`) | – |
 
 ## 4. Rules that protect the raw data

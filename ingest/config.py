@@ -1,5 +1,5 @@
 import os
-# IMPORT THE SHARED DATA PATHS OF THE RESEARCH WORKSPACE (FOLDER NAMES ARE NEVER COPIED, ONLY RE-ROOTED)
+# IMPORT THE SHARED DATA PATHS OF THE RESEARCH WORKSPACE (THE SPY RAW FOLDER IS RE-ROOTED FROM so.paths, NOT COPIED HERE)
 from so import paths as so_paths
 
 """
@@ -11,12 +11,13 @@ historical request settings, the pacing rules, and the staging / merge conventio
 Data root:
     The laptop reaches the data folder of nicodesktop through the network share //100.123.162.2/stock_overflow_data/.
     The root can be overridden with the environment variable SO_INGEST_DATA_PATH (for example to run the tests on a
-    temporary folder). The folder names under the root (store01_rawzone/ibkr_SPY_ohlcv_data/, ...) are taken from the
-    research workspace (so.paths) and re-rooted, so both workspaces always agree on the layout.
+    temporary folder). The SPY raw folder is the research workspace path (so.paths.LOCAL_OHLCV_DATA_FILE_PATH_STR)
+    re-rooted under this data root. The staging folder is the sibling store01_rawzone/ibkr_spy_1min_staging/
+    (SPY_STAGING_FOLDER_NAME_STR).
 
 Staging:
     Downloads never go straight into the raw folder that the research pipeline reads. They are written to the staging
-    folder (store01_rawzone/ibkr_SPY_ohlcv_data_incoming/), checked, and only then added to the raw folder by
+    folder (store01_rawzone/ibkr_spy_1min_staging/), checked, and only then added to the raw folder by
     scripts/merge_staging_into_raw.py (dry run by default).
 """
 
@@ -28,8 +29,18 @@ Data Folders
 DATA_ROOT_PATH_STR = os.environ.get("SO_INGEST_DATA_PATH", "//100.123.162.2/stock_overflow_data/").replace("\\", "/").rstrip("/") + "/"
 # DEFINE THE RAW IBKR MINUTE BAR FOLDER (SAME RELATIVE PATH AS so.paths.LOCAL_OHLCV_DATA_FILE_PATH_STR)
 RAW_OHLCV_PATH_STR = DATA_ROOT_PATH_STR + so_paths.LOCAL_OHLCV_DATA_FILE_PATH_STR[len(so_paths.LOCAL_PATH_STR):]
+# DEFINE THE SPY RAW FOLDER NAME USED WHEN THE SHARE IS RENAMED (THE LIVE RAW PATH STILL COMES FROM so.paths)
+SPY_RAW_FOLDER_NAME_STR = "ibkr_spy_1min"
+# DEFINE THE STAGING FOLDER NAME (SIBLING OF THE RAW FOLDER UNDER store01_rawzone/, NOT A SUFFIX OF THE RAW FOLDER)
+SPY_STAGING_FOLDER_NAME_STR = "ibkr_spy_1min_staging"
+# DEFINE THE PREVIOUS SPY RAW AND STAGING FOLDER NAMES (THE STATUS SCAN STILL REPORTS A FOLDER LEFT UNDER ONE OF THESE)
+SPY_LEGACY_RAW_FOLDER_NAME_STR = "ibkr_SPY_ohlcv_data"
+# DEFINE THE PREVIOUS SPY STAGING FOLDER NAME
+SPY_LEGACY_STAGING_FOLDER_NAME_STR = "ibkr_SPY_ohlcv_data_incoming"
+# DEFINE THE LIST THE STATUS SCAN READS
+SPY_LEGACY_FOLDER_NAME_LIST = [SPY_LEGACY_RAW_FOLDER_NAME_STR, SPY_LEGACY_STAGING_FOLDER_NAME_STR]
 # DEFINE THE STAGING FOLDER (NEW DOWNLOADS WAIT HERE UNTIL THEY ARE MERGED INTO THE RAW FOLDER)
-STAGING_OHLCV_PATH_STR = RAW_OHLCV_PATH_STR.rstrip("/") + "_incoming/"
+STAGING_OHLCV_PATH_STR = os.path.dirname(RAW_OHLCV_PATH_STR.rstrip("/")) + f"/{SPY_STAGING_FOLDER_NAME_STR}/"
 # DEFINE THE FOLDER WHERE MERGED STAGING FILES ARE MOVED (KEPT AS A RECORD OF WHAT WAS ADDED AND WHEN)
 STAGING_MERGED_PATH_STR = f"{STAGING_OHLCV_PATH_STR}merged/"
 # DEFINE THE FOLDER WHERE THE LIVE STREAM WRITES ITS INTRADAY BARS (NEVER MERGED; THE AFTER-CLOSE DOWNLOAD IS THE RECORD)

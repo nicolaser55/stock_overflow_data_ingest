@@ -6,9 +6,9 @@ Downloads VIX and VIX3M from IBKR into their **own** staging and raw folders. Th
 
 | Purpose | Path |
 |---|---|
-| Raw (add-only), one per index and bar size | `store01_rawzone/ibkr_VIX_ohlcv_data/{vix,vix3m}_{1min,daily}/` |
-| Staging, same four names | `store01_rawzone/ibkr_VIX_ohlcv_data_incoming/{vix,vix3m}_{1min,daily}/` |
-| Logs | `ibkr_VIX_ohlcv_data_incoming/download_log.csv`, `merge_log.csv` |
+| Raw (add-only), one per index and bar size | `store01_rawzone/ibkr_vix_family/{vix,vix3m}_{1min,daily}/` |
+| Staging, same four names | `store01_rawzone/ibkr_vix_family_staging/{vix,vix3m}_{1min,daily}/` |
+| Logs | `ibkr_vix_family_staging/download_log.csv`, `merge_log.csv` |
 
 The research pipeline reads every CSV of the SPY raw folder only, so index files can never be picked up by accident. Wiring the index data into the research
 pipeline is a separate, later step.

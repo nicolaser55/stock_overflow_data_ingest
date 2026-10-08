@@ -16,7 +16,7 @@ Prerequisite: IB Gateway (or TWS) running and logged in, API enabled on the port
     python scripts/download_ibkr_index.py --from-start              # everything missing since the first date IBKR has (fills gaps anywhere)
     python scripts/download_ibkr_index.py --symbols VIX3M --bars daily
 
-Folders: <data root>/store01_rawzone/ibkr_VIX_ohlcv_data_incoming/<index>_<bars>/ (staging), ibkr_VIX_ohlcv_data/ (raw, see merge_index_staging_into_raw.py).
+Folders: <data root>/store01_rawzone/ibkr_vix_family_staging/<index>_<bars>/ (staging), ibkr_vix_family/ (raw, see merge_index_staging_into_raw.py).
 Interrupted or failed runs are safe to repeat: finished requests are saved, and already staged or raw dates are skipped.
 Speed: about 2 requests per second at most; the full 1-minute history is about 5,000 sessions for VIX (about 20 years) and 4,200 for VIX3M.
 """

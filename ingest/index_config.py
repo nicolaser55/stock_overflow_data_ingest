@@ -9,11 +9,11 @@ The SPY pipeline (ingest.config and the modules around it) is not touched. The i
 folder and one staging folder per index and bar size, so that the research pipeline (which reads every CSV of the SPY raw
 folder) can never read an index file by accident:
 
-    <data root>/store01_rawzone/ibkr_VIX_ohlcv_data/vix_1min/          raw (add-only), ohlcv_data_YYYY[MM[DD]].csv
-    <data root>/store01_rawzone/ibkr_VIX_ohlcv_data/vix_daily/
-    <data root>/store01_rawzone/ibkr_VIX_ohlcv_data/vix3m_1min/
-    <data root>/store01_rawzone/ibkr_VIX_ohlcv_data/vix3m_daily/
-    <data root>/store01_rawzone/ibkr_VIX_ohlcv_data_incoming/vix_1min/ staging (same four names), download_log.csv, merge_log.csv
+    <data root>/store01_rawzone/ibkr_vix_family/vix_1min/          raw (add-only), ohlcv_data_YYYY[MM[DD]].csv
+    <data root>/store01_rawzone/ibkr_vix_family/vix_daily/
+    <data root>/store01_rawzone/ibkr_vix_family/vix3m_1min/
+    <data root>/store01_rawzone/ibkr_vix_family/vix3m_daily/
+    <data root>/store01_rawzone/ibkr_vix_family_staging/vix_1min/ staging (same four names), download_log.csv, merge_log.csv
 
 The file names, the columns and the timestamp text format are the ones of the SPY raw files (timestamp, open, high, low, close,
 volume, created_ts, date), so every helper of ingest.raw_files (naming, text-preserving merge, roll-up) works on these folders.
@@ -46,9 +46,21 @@ INDEX_BAR_KIND_DICT = {"1min": {"bar_size_str": "1 min"}, "daily": {"bar_size_st
 Folders
 """
 
+# DEFINE THE RAW AND STAGING FOLDER NAMES (THE ONLY PLACE THESE NAMES ARE WRITTEN)
+INDEX_RAW_FOLDER_NAME_STR = "ibkr_vix_family"
+INDEX_STAGING_FOLDER_NAME_STR = "ibkr_vix_family_staging"
+# DEFINE THE PREVIOUS INDEX RAW AND STAGING FOLDER NAMES (THE STATUS SCAN STILL REPORTS A FOLDER LEFT UNDER ONE OF THESE)
+INDEX_LEGACY_RAW_FOLDER_NAME_STR = "ibkr_VIX_ohlcv_data"
+# DEFINE THE PREVIOUS INDEX STAGING FOLDER NAME
+INDEX_LEGACY_STAGING_FOLDER_NAME_STR = "ibkr_VIX_ohlcv_data_incoming"
+# DEFINE THE LIST THE STATUS SCAN READS
+INDEX_LEGACY_FOLDER_NAME_LIST = [INDEX_LEGACY_RAW_FOLDER_NAME_STR, INDEX_LEGACY_STAGING_FOLDER_NAME_STR]
+# DEFINE THE RAW ZONE (PARENT OF THE SPY RAW FOLDER)
+INDEX_RAWZONE_PATH_STR = os.path.dirname(config.RAW_OHLCV_PATH_STR.rstrip("/")) + "/"
 # DEFINE THE RAW AND STAGING ROOTS (SIBLINGS OF THE SPY FOLDERS, UNDER THE SAME DATA ROOT)
-INDEX_RAW_ROOT_PATH_STR = os.path.dirname(config.RAW_OHLCV_PATH_STR.rstrip("/")) + "/ibkr_VIX_ohlcv_data/"
-INDEX_STAGING_ROOT_PATH_STR = INDEX_RAW_ROOT_PATH_STR.rstrip("/") + "_incoming/"
+INDEX_RAW_ROOT_PATH_STR = f"{INDEX_RAWZONE_PATH_STR}{INDEX_RAW_FOLDER_NAME_STR}/"
+# DEFINE THE STAGING ROOT
+INDEX_STAGING_ROOT_PATH_STR = f"{INDEX_RAWZONE_PATH_STR}{INDEX_STAGING_FOLDER_NAME_STR}/"
 # DEFINE THE LOGS (ONLY EVER APPENDED TO)
 INDEX_DOWNLOAD_LOG_FILE_PATH_STR = f"{INDEX_STAGING_ROOT_PATH_STR}download_log.csv"
 INDEX_MERGE_LOG_FILE_PATH_STR = f"{INDEX_STAGING_ROOT_PATH_STR}merge_log.csv"
@@ -85,7 +97,7 @@ def get_index_folder_path_str(symbol_str_in, bar_kind_str_in, staging_bool_in=Fa
         staging_bool_in (bool): True = the staging folder, False = the raw folder
 
     Returns:
-        str: Folder ending with "/", e.g. ".../ibkr_VIX_ohlcv_data/vix3m_1min/"
+        str: Folder ending with "/", e.g. ".../ibkr_vix_family/vix3m_1min/"
     """
     # RETURN THE FOLDER
     return f"{INDEX_STAGING_ROOT_PATH_STR if staging_bool_in else INDEX_RAW_ROOT_PATH_STR}{INDEX_SPEC_DICT[symbol_str_in]['folder_str']}_{bar_kind_str_in}/"

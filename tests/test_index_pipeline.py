@@ -32,6 +32,9 @@ import pandas as pd
 # IMPORT THE INDEX PIPELINE
 from ingest import config
 from ingest import index_config
+from ingest.index_status import get_other_folder_pdf
+from ingest.raw_files import get_backup_path_str
+from so import paths as so_paths
 from ingest.index_download import (IndexRequestMixin, get_index_end_str, get_index_volume_str, get_index_task_list, get_index_closed_session_pdf,
                                    download_index_task_pdf, INDEX_DOWNLOAD_LOG_COL_STR_LIST)
 from ingest.index_merge import merge_index_staging_into_raw_pdf, INDEX_MERGE_LOG_COL_STR_LIST
@@ -129,10 +132,40 @@ def test_folders():
                        for symbol_str in ["VIX", "VIX3M"] for bar_kind_str in ["1min", "daily"] for staging_bool in [False, True]]
     assert len(set(folder_str_list)) == 8
     assert all(not folder_str.startswith(raw_spy_str) and folder_str.endswith("/") for folder_str in folder_str_list)
-    assert raw_spy_str.endswith("/store01_rawzone/ibkr_SPY_ohlcv_data/")
-    assert index_config.get_index_folder_path_str("VIX3M", "1min", True).endswith("/store01_rawzone/ibkr_VIX_ohlcv_data_incoming/vix3m_1min/")
-    assert index_config.get_index_folder_path_str("VIX", "daily").endswith("/store01_rawzone/ibkr_VIX_ohlcv_data/vix_daily/")
+    assert os.path.basename(raw_spy_str.rstrip("/")) == os.path.basename(so_paths.LOCAL_OHLCV_DATA_FILE_PATH_STR.rstrip("/"))
+    assert index_config.get_index_folder_path_str("VIX3M", "1min", True).endswith("/store01_rawzone/ibkr_vix_family_staging/vix3m_1min/")
+    assert index_config.get_index_folder_path_str("VIX", "daily").endswith("/store01_rawzone/ibkr_vix_family/vix_daily/")
     passed("folders: 8 separate folders, none inside the SPY raw folder")
+
+# TEST: THE FOUR RESOLVED FOLDER PATHS
+def test_renamed_folder_paths():
+    rawzone_str = os.path.dirname(config.RAW_OHLCV_PATH_STR.rstrip("/")) + "/"
+    spy_raw_str = config.RAW_OHLCV_PATH_STR
+    spy_staging_str = config.STAGING_OHLCV_PATH_STR
+    index_raw_str = index_config.INDEX_RAW_ROOT_PATH_STR
+    index_staging_str = index_config.INDEX_STAGING_ROOT_PATH_STR
+    assert spy_raw_str == config.DATA_ROOT_PATH_STR + so_paths.LOCAL_OHLCV_DATA_FILE_PATH_STR[len(so_paths.LOCAL_PATH_STR):]
+    assert config.SPY_RAW_FOLDER_NAME_STR == "ibkr_spy_1min"
+    assert spy_staging_str == f"{rawzone_str}ibkr_spy_1min_staging/"
+    assert index_raw_str == f"{rawzone_str}ibkr_vix_family/"
+    assert index_staging_str == f"{rawzone_str}ibkr_vix_family_staging/"
+    index_folder_str_list = [index_raw_str, index_staging_str] + [
+        index_config.get_index_folder_path_str(symbol_str, bar_kind_str, staging_bool)
+        for symbol_str in ["VIX", "VIX3M"] for bar_kind_str in ["1min", "daily"] for staging_bool in [False, True]]
+    assert all(not folder_str.startswith(spy_raw_str) for folder_str in index_folder_str_list)
+    assert os.path.basename(get_backup_path_str(index_raw_str).rstrip("/")).startswith("ibkr_vix_family_backup_")
+    assert os.path.basename(get_backup_path_str(spy_raw_str).rstrip("/")).startswith(os.path.basename(spy_raw_str.rstrip("/")) + "_backup_")
+    scan_root_str = tempfile.mkdtemp(prefix="so_index_names_").replace("\\", "/") + "/"
+    for name_str in ["ibkr_vix_family", "ibkr_vix_family_staging", "ibkr_SPY_ohlcv_data", "ibkr_SPY_ohlcv_data_incoming",
+                     "ibkr_VIX_ohlcv_data", "ibkr_VIX_ohlcv_data_incoming", "ibkr_VIX_ohlcv_data_backup_20261008_120000",
+                     "ibkr_spy_1min_backup_20261008_120000", "unrelated"]:
+        os.makedirs(f"{scan_root_str}{name_str}")
+    other_name_set = set(get_other_folder_pdf(scan_root_str)["name"])
+    assert "ibkr_vix_family" not in other_name_set and "ibkr_vix_family_staging" not in other_name_set
+    assert {"ibkr_SPY_ohlcv_data", "ibkr_SPY_ohlcv_data_incoming", "ibkr_VIX_ohlcv_data", "ibkr_VIX_ohlcv_data_incoming",
+            "ibkr_VIX_ohlcv_data_backup_20261008_120000", "ibkr_spy_1min_backup_20261008_120000"} <= other_name_set
+    assert "unrelated" not in other_name_set
+    passed("renamed folders: four resolved paths, index folders outside the SPY raw folder, old names still found")
 
 # TEST: HELPERS
 def test_helpers():
@@ -303,6 +336,87 @@ def test_merge():
     assert not os.path.exists(f"{daily_staging_str}ohlcv_data_2026.csv") and any(name_str.startswith("daily_backup_") or "_backup_" in name_str for name_str in os.listdir(raw_str))
     passed("merge: dry run, add-only 1-minute files, checks, include-partial, daily merge with existing rows winning, log")
 
+# TEST: THE FOLDER RENAME ON A TEMPORARY DATA ROOT
+def test_rename_data_folders():
+    import importlib.util
+    root_str = os.path.dirname(TESTS_PATH_STR)
+    script_str = os.path.join(root_str, "scripts", "rename_data_folders.py")
+    spec = importlib.util.spec_from_file_location("rename_data_folders", script_str)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    assert module.get_manifest_difference_str_list(
+        [{"relative_path": "ibkr_SPY_ohlcv_data/a.csv", "size_bytes": "1", "row_count": "0", "sha256": "aa"}],
+        [{"relative_path": "ibkr_spy_1min/a.csv", "size_bytes": "1", "row_count": "0", "sha256": "bb"}],
+        [("ibkr_SPY_ohlcv_data", "ibkr_spy_1min")])
+    assert module.get_manifest_difference_str_list(
+        [{"relative_path": "ibkr_SPY_ohlcv_data/a.csv", "size_bytes": "1", "row_count": "0", "sha256": "aa"}],
+        [{"relative_path": "ibkr_spy_1min/a.csv", "size_bytes": "1", "row_count": "0", "sha256": "aa"}],
+        [("ibkr_SPY_ohlcv_data", "ibkr_spy_1min")]) == []
+
+    def build_tree(base_str):
+        rawzone_str = module.get_rawzone_path_str(base_str)
+        file_dict = {"ibkr_SPY_ohlcv_data/ohlcv_data_2024.csv": b"timestamp,open\r\n2024-01-02,100.00\r\n",
+                     "ibkr_SPY_ohlcv_data/nested/note.txt": b"keep\r\n",
+                     "ibkr_SPY_ohlcv_data_incoming/download_log.csv": b"status\r\nok\r\n",
+                     "ibkr_SPY_ohlcv_data_incoming/live/ohlcv_live_20261008.csv": b"timestamp\r\n",
+                     "ibkr_SPY_ohlcv_data_incoming/merged/old.csv": b"timestamp,open\r\n",
+                     "ibkr_SPY_ohlcv_data_backup_20261001_010101/ohlcv_data_2024.csv": b"timestamp,open\r\n2024-01-02,100.00\r\n",
+                     "ibkr_VIX_ohlcv_data/vix_1min/ohlcv_data_20261001.csv": b"timestamp,open\r\n2026-10-01,1\r\n",
+                     "ibkr_VIX_ohlcv_data/vix_1min_backup_20261001_010101/ohlcv_data_20261001.csv": b"timestamp,open\r\n2026-10-01,1\r\n",
+                     "ibkr_VIX_ohlcv_data_incoming/vix_daily/ohlcv_data_2026.csv": b"timestamp,open\r\n2026-10-01,2\r\n",
+                     "ibkr_VIX_ohlcv_data_backup_20261002_020202/vix_1min/a.csv": b"timestamp,open\r\n",
+                     "ibkr_ohlcv_data_backup_20261004_185149/keep.csv": b"do-not-rename\r\n",
+                     "unrelated/x.csv": b"x\r\n"}
+        for relative_str, blob_bytes in file_dict.items():
+            path_str = f"{rawzone_str}{relative_str}"
+            os.makedirs(os.path.dirname(path_str), exist_ok=True)
+            with open(path_str, "wb") as file_object:
+                file_object.write(blob_bytes)
+        return rawzone_str, file_dict
+
+    env_dict = {**os.environ, "PYTHONPATH": root_str, "PYTHONIOENCODING": "utf-8"}
+    base_str = tempfile.mkdtemp(prefix="so_rename_").replace("\\", "/")
+    rawzone_str, file_dict = build_tree(base_str)
+    dry_manifest_str = f"{base_str}/manifest_dry.csv"
+    dry = subprocess.run([sys.executable, script_str, "--data-root", base_str, "--manifest", dry_manifest_str],
+                         capture_output=True, text=True, env=env_dict, encoding="utf-8")
+    assert dry.returncode == 0 and "Dry run: nothing was renamed." in dry.stdout and "ibkr_SPY_ohlcv_data -> ibkr_spy_1min" in dry.stdout \
+        and "Rename-Item -LiteralPath" in dry.stdout, dry.stdout + dry.stderr
+    assert os.path.isdir(f"{rawzone_str}ibkr_SPY_ohlcv_data") and not os.path.exists(f"{rawzone_str}ibkr_spy_1min")
+    dry_manifest_text = open(dry_manifest_str, encoding="utf-8").read()
+    assert "ibkr_SPY_ohlcv_data/ohlcv_data_2024.csv" in dry_manifest_text and "ibkr_ohlcv_data_backup_20261004_185149" not in dry_manifest_text
+    blocked_str = tempfile.mkdtemp(prefix="so_rename_block_").replace("\\", "/")
+    blocked_zone_str, _ = build_tree(blocked_str)
+    os.makedirs(f"{blocked_zone_str}ibkr_spy_1min")
+    with open(f"{blocked_zone_str}ibkr_spy_1min/keep.txt", "wb") as file_object:
+        file_object.write(b"keep")
+    blocked_manifest_str = f"{blocked_str}/manifest_block.csv"
+    blocked = subprocess.run([sys.executable, script_str, "--apply", "--data-root", blocked_str, "--manifest", blocked_manifest_str],
+                             capture_output=True, text=True, env=env_dict, encoding="utf-8")
+    assert blocked.returncode != 0 and "already exists" in blocked.stdout and not os.path.exists(blocked_manifest_str), blocked.stdout + blocked.stderr
+    assert open(f"{blocked_zone_str}ibkr_spy_1min/keep.txt", "rb").read() == b"keep" and os.path.isdir(f"{blocked_zone_str}ibkr_SPY_ohlcv_data")
+    applied = subprocess.run([sys.executable, script_str, "--apply", "--data-root", base_str, "--manifest", f"{base_str}/manifest_apply.csv"],
+                             capture_output=True, text=True, env=env_dict, encoding="utf-8")
+    assert applied.returncode == 0 and "identical" in applied.stdout, applied.stdout + applied.stderr
+    renamed_dict = {"ibkr_spy_1min/ohlcv_data_2024.csv": "ibkr_SPY_ohlcv_data/ohlcv_data_2024.csv",
+                    "ibkr_spy_1min/nested/note.txt": "ibkr_SPY_ohlcv_data/nested/note.txt",
+                    "ibkr_spy_1min_staging/download_log.csv": "ibkr_SPY_ohlcv_data_incoming/download_log.csv",
+                    "ibkr_spy_1min_staging/live/ohlcv_live_20261008.csv": "ibkr_SPY_ohlcv_data_incoming/live/ohlcv_live_20261008.csv",
+                    "ibkr_spy_1min_staging/merged/old.csv": "ibkr_SPY_ohlcv_data_incoming/merged/old.csv",
+                    "ibkr_spy_1min_backup_20261001_010101/ohlcv_data_2024.csv": "ibkr_SPY_ohlcv_data_backup_20261001_010101/ohlcv_data_2024.csv",
+                    "ibkr_vix_family/vix_1min/ohlcv_data_20261001.csv": "ibkr_VIX_ohlcv_data/vix_1min/ohlcv_data_20261001.csv",
+                    "ibkr_vix_family/vix_1min_backup_20261001_010101/ohlcv_data_20261001.csv": "ibkr_VIX_ohlcv_data/vix_1min_backup_20261001_010101/ohlcv_data_20261001.csv",
+                    "ibkr_vix_family_staging/vix_daily/ohlcv_data_2026.csv": "ibkr_VIX_ohlcv_data_incoming/vix_daily/ohlcv_data_2026.csv",
+                    "ibkr_vix_family_backup_20261002_020202/vix_1min/a.csv": "ibkr_VIX_ohlcv_data_backup_20261002_020202/vix_1min/a.csv"}
+    for new_str, old_str in renamed_dict.items():
+        assert open(f"{rawzone_str}{new_str}", "rb").read() == file_dict[old_str], new_str
+    for old_name_str in ["ibkr_SPY_ohlcv_data", "ibkr_SPY_ohlcv_data_incoming", "ibkr_VIX_ohlcv_data", "ibkr_VIX_ohlcv_data_incoming",
+                         "ibkr_SPY_ohlcv_data_backup_20261001_010101", "ibkr_VIX_ohlcv_data_backup_20261002_020202"]:
+        assert not os.path.exists(f"{rawzone_str}{old_name_str}"), old_name_str
+    assert open(f"{rawzone_str}ibkr_ohlcv_data_backup_20261004_185149/keep.csv", "rb").read() == b"do-not-rename\r\n"
+    assert open(f"{rawzone_str}unrelated/x.csv", "rb").read() == b"x\r\n"
+    passed("rename script: dry run, refuse when the new folder exists, move on a temporary root, bytes identical")
+
 # TEST: THE SCRIPTS
 def test_scripts():
     root_str = os.path.dirname(TESTS_PATH_STR)
@@ -317,10 +431,12 @@ def test_scripts():
 # RUN THE TESTS
 if __name__ == "__main__":
     test_folders()
+    test_renamed_folder_paths()
     test_helpers()
     test_planning()
     test_minute_download()
     test_daily_download()
     test_merge()
+    test_rename_data_folders()
     test_scripts()
     print("\nAll index pipeline tests passed ✅")
