@@ -90,7 +90,7 @@ reported bad ticks, and `pipeline/step00_data_quality_check.ipynb`. The same ste
 | `rebuild_ohlcv_data.py` | rewrites a folder into the organized layout, into `<raw>_rebuilt/` by default | `--apply` |
 | `find_ohlcv_data_issues.py` | missing sessions, missing / extra minutes, duplicates, bars on non-session dates | never (`--save` a CSV) |
 | `download_ibkr_index.py`, `merge_index_staging_into_raw.py`, `index_data_status.py` | VIX / VIX3M: download into staging, add-only merge, read-only status (`INDEX_PIPELINE.md`) | staging; raw with `--apply`; never |
-| `download_ibkr_stock.py`, `merge_stock_staging_into_raw.py`, `stock_data_status.py` | stock (AAPL): download 1-minute and daily bars into staging, add-only merge, read-only status (`STOCK_PIPELINE.md`) | staging; raw with `--apply`; never |
+| `download_ibkr_stock.py`, `merge_stock_staging_into_raw.py`, `stock_data_status.py`, `check_stock_daily_vs_minute.py` | stock (AAPL): download 1-minute and daily bars into staging, add-only merge, read-only status, daily-vs-1-minute comparison (`STOCK_PIPELINE.md`) | staging; raw with `--apply`; never; never |
 | `gcs_mount.py` | mounts the GCS bucket with rclone (key path in `SO_GCS_KEY_PATH`) | – |
 
 ## 4. Rules that protect the raw data

@@ -15,7 +15,9 @@ What is verified (AAPL; the engines themselves are covered by test_ingest.py and
        raw is skipped, price issues / partial refused, --include-partial); daily files merged into the raw year file with existing rows winning, conflicts counted
        and a sibling backup folder; the merge logs.
     6. The status: the folder table, the missing sessions, the log problems; the stock folders are not reported as "other folders".
-    7. The scripts: --list needs no connection, the merge dry run and the status run on empty folders.
+    7. The comparison of a daily bar with the aggregated 1-minute bars of the same date (prices, volume ratio).
+    8. The scripts: --list needs no connection, the merge dry run, the status and the comparison run on empty folders. The list of unfinished requests printed after a
+       download is empty when every request is complete.
 """
 
 import os
@@ -40,9 +42,10 @@ from ingest.index_download import INDEX_DOWNLOAD_LOG_COL_STR_LIST
 from ingest.index_merge import INDEX_MERGE_LOG_COL_STR_LIST
 from ingest.index_status import get_other_folder_pdf
 from ingest.raw_maintenance import MERGE_LOG_COL_STR_LIST
-from ingest.stock_download import get_stock_session_pdf, get_stock_daily_task_list, download_stock_minute_pdf, download_stock_daily_pdf
+from ingest.stock_download import (get_stock_session_pdf, get_stock_daily_task_list, download_stock_minute_pdf, download_stock_daily_pdf,
+                                   get_stock_problem_pdf)
 from ingest.stock_merge import merge_stock_staging_into_raw_pdf
-from ingest.stock_status import get_stock_status_pdf, get_stock_missing_date_list, get_stock_log_problem_pdf
+from ingest.stock_status import get_stock_status_pdf, get_stock_missing_date_list, get_stock_log_problem_pdf, get_stock_daily_vs_minute_pdf
 
 # DEFINE THE CLOCK OF THE TESTS (A TUESDAY EVENING, AFTER THE CLOSE)
 NOW_TS = pd.Timestamp("2026-10-06 18:00", tz=config.NY_TZ_STR)
@@ -183,6 +186,12 @@ def test_minute_download():
     assert not os.path.exists(config.RAW_OHLCV_PATH_STR) and not os.path.exists(config.STAGING_OHLCV_PATH_STR)
     # A SECOND PLAN REQUESTS ONLY THE SESSION THAT WAS NOT SAVED
     assert [str(d) for d in get_stock_session_pdf("AAPL", "1min", date_list_in=date_list, now_ny_ts_in=NOW_TS, alert_in=False)["date"]] == ["2026-09-16"]
+    # THE UNFINISHED REQUESTS OF THE SUMMARY; WHEN EVERY REQUEST IS COMPLETE THE LIST IS EMPTY (NOT ROWS OF MISSING VALUES)
+    problem_pdf = get_stock_problem_pdf("AAPL", "1min", summary_pdf.reset_index(drop=True))
+    assert problem_pdf[["symbol", "bar_kind", "label", "status_str", "saved_bool"]].values.tolist() == [["AAPL", "1min", "2026-09-15", "partial", True],
+                                                                                                       ["AAPL", "1min", "2026-09-16", "empty", False]]
+    assert get_stock_problem_pdf("AAPL", "1min", summary_pdf[summary_pdf["status_str"] == "complete"].reset_index(drop=True)).empty
+    assert get_stock_problem_pdf("AAPL", "1min", summary_pdf.iloc[0:0].reset_index(drop=True)).empty
     passed("1-minute download: AAPL contract, complete / partial / empty / error then ok, volume kept, SPY file format and log, SPY folders untouched")
 
 
@@ -200,6 +209,7 @@ def test_daily_download():
     summary_pdf = download_stock_daily_pdf(app, "AAPL", task_list, log_file_path_str_in=log_str, **fast_dict)
     app.disconnect_app()
     assert summary_pdf.loc[0, ["symbol", "bar_kind", "status_str", "saved_bool", "attempt_int", "bar_count_int", "missing_count_int"]].tolist() == ["AAPL", "daily", "partial", True, 3, 12, 1]
+    assert get_stock_problem_pdf("AAPL", "daily", summary_pdf)[["symbol", "bar_kind", "label", "status_str"]].values.tolist() == [["AAPL", "daily", "2026", "partial"]]
     assert set(app.request_log) == {("AAPL", "STK", "SMART", task_list[0]["end_datetime_str"], "2 Y", "1 day", 1, "TRADES", 2)}
     # THE STAGED YEAR FILE: THE SPY COLUMNS, A DATE LABEL AT MIDNIGHT NEW YORK, THE VOLUME KEPT, NO BAR ON LABOR DAY OR ON THE MISSING DATE
     text_pdf = pd.read_csv(f"{staging_str}ohlcv_data_2026.csv", dtype=str, keep_default_na=False)
@@ -321,6 +331,29 @@ def test_status():
     passed("status: folder table, missing sessions, log problems, stock folders not reported as other folders")
 
 
+# TEST: THE DAILY BAR AGAINST THE 1-MINUTE BARS OF THE SAME DATE
+def test_daily_vs_minute():
+    minute_str, daily_str = [folder_tuple[0] for folder_tuple in (get_folder_tuple("cmp_minute"), get_folder_tuple("cmp_daily"))]
+    # 2026-09-14: THE DAILY BAR AGREES (390 MINUTES OF 1000 SHARES); 2026-09-15: THE DAILY VOLUME IS 100 TIMES LARGER AND THE PRICES DIFFER (A DIFFERENT UNIT / BASIS);
+    # 2026-09-16: ONLY 1-MINUTE BARS; 2026-09-17: ONLY A DAILY BAR (BOTH ARE LEFT OUT)
+    for date_str in ["2026-09-14", "2026-09-15", "2026-09-16"]:
+        write_session_file(minute_str, date_str, price_list_in=(100.0, 101.0, 99.0, 100.5))
+    os.makedirs(daily_str)
+    pd.DataFrame({"timestamp": [f"{d} 00:00:00-04:00" for d in ["2026-09-14", "2026-09-15", "2026-09-17"]], "open": ["100.0", "50.0", "1"], "high": ["101.0", "50.5", "1"],
+                  "low": ["99.0", "49.5", "1"], "close": ["100.5", "50.25", "1"], "volume": ["390000", "39000000", "1"], "created_ts": ["", "", ""],
+                  "date": ["2026-09-14", "2026-09-15", "2026-09-17"]}).to_csv(f"{daily_str}ohlcv_data_2026.csv", index=False)
+    compare_pdf = get_stock_daily_vs_minute_pdf("AAPL", None, [minute_str], [daily_str]).set_index("date")
+    assert [str(d) for d in compare_pdf.index] == ["2026-09-14", "2026-09-15"]
+    agree_row = compare_pdf.loc[pd.Timestamp("2026-09-14").date()]
+    assert agree_row[["daily_open", "minute_open", "daily_high", "minute_high", "daily_low", "minute_low", "daily_close", "minute_close"]].tolist() == [100.0, 100.0, 101.0, 101.0, 99.0, 99.0, 100.5, 100.5]
+    assert agree_row[["daily_volume", "minute_volume", "volume_ratio_float"]].tolist() == [390000.0, 390000.0, 1.0]
+    differ_row = compare_pdf.loc[pd.Timestamp("2026-09-15").date()]
+    assert differ_row["volume_ratio_float"] == 100.0 and differ_row["daily_close"] == 50.25 and differ_row["minute_close"] == 100.5
+    assert [str(d) for d in get_stock_daily_vs_minute_pdf("AAPL", ["2026-09-15"], [minute_str], [daily_str])["date"]] == ["2026-09-15"]
+    assert get_stock_daily_vs_minute_pdf("AAPL", ["2026-09-16"], [minute_str], [daily_str]).empty
+    passed("daily vs 1-minute: aggregation, volume ratio, dates present in only one of them left out")
+
+
 # TEST: THE SCRIPTS
 def test_scripts():
     root_str = os.path.dirname(TESTS_PATH_STR)
@@ -340,6 +373,8 @@ def test_scripts():
     assert merged.returncode == 0 and "no staging files" in merged.stdout, merged.stdout + merged.stderr
     status = run("stock_data_status.py")
     assert status.returncode == 0 and "Missing sessions" in status.stdout and "AAPL" in status.stdout and "ibkr_aapl" not in status.stderr, status.stdout + status.stderr
+    compared = run("check_stock_daily_vs_minute.py", "--dates", "2026-09-14")
+    assert compared.returncode == 0 and ("No date with both" in compared.stdout or "volume_ratio_float" in compared.stdout), compared.stdout + compared.stderr
     passed("scripts: --list plans both bar kinds without a connection, the merge dry run and the status run")
 
 
@@ -351,5 +386,6 @@ if __name__ == "__main__":
     test_daily_download()
     test_merge()
     test_status()
+    test_daily_vs_minute()
     test_scripts()
     print("\nAll stock pipeline tests passed ✅")

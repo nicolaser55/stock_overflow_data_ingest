@@ -170,3 +170,28 @@ def download_stock_daily_pdf(app_in, symbol_str_in, task_list_in, log_file_path_
     # RUN THE INDEX ENGINE WITH THE LOG OF THE STOCK
     return download_index_task_pdf(app_in, task_list_in, log_file_path_str_in=log_file_path_str_in or stock_config.get_stock_log_path_str(symbol_str_in, "daily", "download"),
                                    **download_kwargs_in)
+
+
+# FUNCTION: LIST THE REQUESTS OF A DOWNLOAD SUMMARY THAT DID NOT END COMPLETE
+def get_stock_problem_pdf(symbol_str_in, bar_kind_str_in, summary_pdf_in):
+    """
+    Args:
+        symbol_str_in (str): Stock symbol of STOCK_SPEC_DICT
+        bar_kind_str_in (str): "1min" or "daily"
+        summary_pdf_in (pd.DataFrame): Result of download_stock_minute_pdf (one row per session) or download_stock_daily_pdf (one row per year)
+
+    Returns:
+        pd.DataFrame: symbol, bar_kind, label (the session date; for daily bars the year), status_str, saved_bool, missing_count_int of every request whose final
+                      status is not "complete" (empty when all are complete)
+    """
+    # DEFINE THE COLUMNS
+    col_str_list = ["symbol", "bar_kind", "label", "status_str", "saved_bool", "missing_count_int"]
+    # IF NOTHING WAS DOWNLOADED
+    if summary_pdf_in.empty:
+        # RETURN AN EMPTY TABLE
+        return pd.DataFrame(columns=col_str_list)
+    # ADD THE COLUMNS BEFORE FILTERING (ASSIGNING A SERIES TO AN EMPTY FILTERED FRAME WOULD ADD ROWS OF MISSING VALUES)
+    label_series = summary_pdf_in["label"] if bar_kind_str_in == "daily" else summary_pdf_in["date"].astype(str)
+    full_pdf = summary_pdf_in.assign(symbol=symbol_str_in, bar_kind=bar_kind_str_in, label=label_series)
+    # RETURN THE REQUESTS THAT ARE NOT COMPLETE
+    return full_pdf[full_pdf["status_str"] != "complete"][col_str_list].reset_index(drop=True)

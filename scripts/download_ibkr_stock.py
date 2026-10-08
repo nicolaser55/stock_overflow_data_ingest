@@ -6,7 +6,8 @@ from ingest import stock_config
 # IMPORT THE IBKR APPLICATIONS (1-MINUTE BARS: IbkrApp, DAILY BARS: IndexApp) AND THE STOCK DOWNLOAD
 from ingest.ibkr_client import IbkrApp
 from ingest.index_download import IndexApp
-from ingest.stock_download import get_stock_session_pdf, get_stock_daily_task_list, download_stock_minute_pdf, download_stock_daily_pdf
+from ingest.stock_download import (get_stock_session_pdf, get_stock_daily_task_list, download_stock_minute_pdf, download_stock_daily_pdf,
+                                   get_stock_problem_pdf)
 
 """
 Download the 1-minute and daily bars of a stock (AAPL) from IBKR into its staging folders (nothing is added to the raw folders)
@@ -81,16 +82,15 @@ def main():
                     continue
                 if bar_kind_str == "daily":
                     summary_pdf = download_stock_daily_pdf(app, symbol_str, plan_item, max_in_flight_int_in=args.max_in_flight)
-                    problem_pdf_list.append(summary_pdf[summary_pdf["status_str"] != "complete"])
                 else:
                     summary_pdf = download_stock_minute_pdf(app, symbol_str, plan_item, max_in_flight_int_in=args.max_in_flight)
-                    problem_pdf_list.append(summary_pdf[summary_pdf["status_str"] != "complete"].assign(symbol=symbol_str, bar_kind="1min", label=summary_pdf["date"].astype(str)))
+                problem_pdf_list.append(get_stock_problem_pdf(symbol_str, bar_kind_str, summary_pdf))
         finally:
             app.disconnect_app()
     # DISPLAY THE PROBLEMS
     problem_pdf = pd.concat(problem_pdf_list, ignore_index=True) if problem_pdf_list else pd.DataFrame()
     print(f"\nNot complete: {len(problem_pdf)}")
-    print(problem_pdf[["symbol", "bar_kind", "label", "status_str", "saved_bool", "missing_count_int"]].to_string(index=False)) if not problem_pdf.empty else None
+    print(problem_pdf.to_string(index=False)) if not problem_pdf.empty else None
     print("Next: python scripts/merge_stock_staging_into_raw.py   (dry run), then add --apply")
 
 

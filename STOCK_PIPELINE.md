@@ -19,6 +19,7 @@ The research pipeline reads every CSV of the SPY raw folder only, so stock files
 python scripts/download_ibkr_stock.py --list                          # plan only, no connection
 python scripts/download_ibkr_stock.py --dates 2024-08-05 2025-04-09   # small trial first (1-minute and daily)
 python scripts/stock_data_status.py                                   # what is where, what is missing
+python scripts/check_stock_daily_vs_minute.py                         # daily bar vs the aggregated 1-minute bars of the same dates (prices, volume ratio)
 python scripts/download_ibkr_stock.py --date1 2024-01-02              # everything missing from that date
 python scripts/download_ibkr_stock.py                                 # everything missing after the last date present (nothing present: from the start date in ingest/stock_config.py)
 python scripts/download_ibkr_stock.py --from-start                    # also fills gaps anywhere in the history
@@ -53,8 +54,9 @@ Repeating a run is safe: finished requests are saved, present dates are skipped.
   old price basis while later downloads are on the new one, because raw files are add-only. AAPL split 7:1 in 2014 and 4:1 in 2020, so a history downloaded now is on the post-2020 basis. Check
   it: compare a downloaded 2019 close with a known unadjusted price, and after any future AAPL split re-download with `--redownload` into a clean folder before using the data. A daily
   `--redownload` of dates already in raw followed by the merge dry run shows `conflict` counts when the values changed.
-- **Volume.** The unit of IBKR's stock volume (shares or round lots of 100) is not checked here. It is the same convention as the SPY raw files because the same engine and request are used; compare one
-  day's daily volume with the sum of its 1-minute volumes before using it.
+- **Volume.** The unit of IBKR's stock volume (shares or round lots of 100) is not checked here. It is the same convention as the SPY raw files because the same engine and request are used.
+  `scripts/check_stock_daily_vs_minute.py` prints the daily bar next to the aggregated 1-minute bars of the same dates: a volume ratio near 1 and equal prices mean the two downloads agree; a ratio near
+  100 or 0.01, or different prices, is a finding to look into.
 - The pacing: about 2 requests per second at most, so the full 1-minute history (about 4,900 sessions from 2007) takes roughly 1 hour or more.
 - All behaviour above was tested only against the simulated server (`tests/test_stock_pipeline.py`).
 
